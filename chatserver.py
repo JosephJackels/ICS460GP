@@ -2,28 +2,43 @@ from socket import *
 import sys
 import threading
 
+#check that correct amount of paramaters are given
 if len(sys.argv) < 2:
 	print("please start server via $python3 chatserver.py port")
 	sys.exit()
-
+#set port variable
 port = (int) sys.argv[1]
+
+#create tcp socket
 serverSocket = socket(AF_INET, SOCK_STREAM)
+
+#get hostname ex. 127.0.1.1
 host = gethostbyname(gethostname())
+
+#bind host/port to socket
 serverSocket.bind((host,port))
 print("server listening at", host, "on port", port)
 serverSocket.listen(5)
 
 maxConnections = 10
 
+#list of dispatched threads for handling messages
 connectionList = list() #[thread1, thread2, thread3...]
+
+#list of currently active users, along with their assigned socket
 activeUsers = list() #[(joe, joeSocket), (bill, billSocket), (beth, bethSocket)...]
+
 tempList = list() # for clearing /copying lists
+
+#list of saved username/password pairs
 credentialList = list() #[(joe, password), (bill, password1), (beth, password2)] READ IN FROM FILE
 
+#mutexes (mutual exclusion locks) for accessing relevent lists without threading issues
 userListMutex = threading.Lock()
 credentialListMutex = threading.Lock()
 fileMutex = threading.Lock()
 
+#attempt to read in credentials from file credentials.txt
 try:
 	credentialFile = open('credentials.txt', 'r')
 	lines = credentialFile.readLines()
@@ -32,12 +47,14 @@ try:
 		credentialList.append((line.split()[0], line.split()[1]))#add (user, pass) to credential list
 	credentialFile.close()
 except IOError:
-	#File not found? create file?
+	#File not found, try to create file
 	try:
 		credentialFile = open('credentials.txt', 'w')
 	except IOError:
+		#can't create file, possible permissions error
 		print("Error creating file. Are you allowed to?")
 
+#function used by client threads
 def client_connection_thread(clientSocket):
 	global userListMutex
 	global credentialListMutex
@@ -59,6 +76,7 @@ def client_connection_thread(clientSocket):
 	
 	credentialListMutex.release()
 
+	#check if the user ios already logged in
 	userListMutex.acquire()
 	for userTuple in activeUsers:
 		if userTuple[0] == username:
@@ -69,11 +87,14 @@ def client_connection_thread(clientSocket):
 			return
 	userListMutex.release()
 
+	#handle login for existing user
 	if(existingUser):
 		#acknowledge client is existing
 		clientSocket.send("existing".encode())
 		accepted = False
 		attemptCount = 0
+
+		#allow user to attempt to login, 3 false passwords gives error and ends thread
 		while(not accepted):
 			#wait for password
 			password = clientSocket.recv(4096).decode()
@@ -92,10 +113,12 @@ def client_connection_thread(clientSocket):
 				#allowed 3 attempts
 				attemptCount+=1
 				if attemptCount >= 3:
+					#tell client password was refused for third time, end thread
 					clientSocket.send("final refuse".encode())
 					clientSocket.close()
 					return
 				else:
+					#tell client password is incorrect, allow to try again
 					clientSocket.send("refused".encode())
 	else:
 		#acknowledge client is new
@@ -107,6 +130,7 @@ def client_connection_thread(clientSocket):
 		#aqcknowledge new registration
 		message = "News User: " + username + " Password: " + password
 		clientSocket.send(message.encode())
+		
 		#register - add to file AND update credentialList
 		fileMutex.acquire()
 		file = open('credential.txt', a)

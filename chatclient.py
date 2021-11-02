@@ -53,7 +53,7 @@ else:
 #just recieved operation***
 operating = True
 while operating:
-	command = input("Please enter a command:\n\tPM - public message to all active users.\n\tDM - direct Mmessage toa  single user\n\tEX - exit program and logout of account.")
+	command = input("Please enter a command:\n\tPM - public message to all active users.\n\tDM - direct message to a  single user\n\tEX - exit program and logout of account.")
 
 	if command == "PM":
 
