@@ -65,17 +65,30 @@ while(response != "udp recieve") {
 #just recieved operation***
 operating = True
 while operating:
+
 	command = input("Please enter a command:\n\tPM - public message to all active users.\n\tDM - direct message to a  single user\n\tEX - exit program and logout of account.")
 
 	if command == "PM":
+		serverSocket.send(command.encode())
+		response = serverSocket.recv(4096).decode()
+		if response != "PM":
+			print("Did not recognize PM request?")
+			#exit this block? go to beginning of while?
+
+		#ask for message
+		message = input("Message: ")
+		serverSocket.send(message.encode())
+		response = serverSocket.recv(4096).decode()
+		if response != "complete":
+			print("message wasn't sent?")
 
 	elif command == "DM":
 		serverSocket.send(command.encode())
 		response = serverSocket.recv(4096).decode()
 		if response != "DM":
 			print("Server did not recieve DM request properly?")
-			serverSocket.close()
-			sys.exit()
+			#exit or go to beginning of while loop?
+
 		print("Select a user to send a message to:")
 		response = serverSocket.recv(4096).decode()
 		while response != "END":
@@ -83,7 +96,20 @@ while operating:
 			response = serverSocket.recv(4096).decode()
 		sendTo = input("To: ")
 		serverSocket.send(sendTo.encode())
-		response = serverSocket.recv()
+		response = serverSocket.recv(4096).decode()
+		if(response == "DNE"):
+			#handle Does Not Exist
+			print("User does not exist. Re-enter username:")
+		elif(response == "message"):
+			#get message input, send it etc.
+			message = input("Enter message:")
+			serverSocket.send(message.encode())
+			response = serverSocket.recv(4096).decode()
+			if(response != "complete"):
+				print("Something went wrong")
+		else:
+			print("Invalid response?")
+		
 	elif command == "EX":
 		operating = False
 		print("Sending logout command to server")
@@ -99,6 +125,9 @@ while operating:
 		sys.exit()
 	else:
 		print("Unknown command.")
+
+	# end of recieving command
+	# print all pending messages from recieving thread?
 
 def message_recieving_thread(udpSocket):
 	#listen for PM/DM being sent to this socket
