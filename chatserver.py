@@ -130,7 +130,7 @@ def client_connection_thread(clientSocket):
 		#aqcknowledge new registration
 		message = "News User: " + username + " Password: " + password
 		clientSocket.send(message.encode())
-		
+
 		#register - add to file AND update credentialList
 		fileMutex.acquire()
 		file = open('credential.txt', a)
@@ -149,6 +149,10 @@ def client_connection_thread(clientSocket):
 	activeUsers.append((username, clientSocket))
 	userListMutex.release()
 	running = True
+	
+	#recieve from the tcp socket the address of the udp socket
+	# save somewhere in the active userList the udp address for sending messages to
+	# USERlIST WILL HAVE TO BE CHANGED TO SOMETHING LIKE (username, tcpSocket, udpSocket)
 	
 	while running:
 		#prompt client for operation

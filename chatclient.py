@@ -21,6 +21,9 @@ except ConnectionRefusedError:
 	print("Did you use the order: hostname port requestedFile for the passed arguements?\nAre you using the correct host and port?")
 	sys.exit()
 
+# create a udp socket
+# get the addreess
+
 serverSocket.send(username.encode())
 response = serverSocket.recv(4096).decode()
 
@@ -49,6 +52,10 @@ else:
 	print("server error?")
 	serverSocket.close()
 	sys.exit()
+
+# send the address of the udp socket to the server
+# dispatch a thread that handles recieving messages
+# something like handle_messages(udp_socket)
 
 #just recieved operation***
 operating = True
