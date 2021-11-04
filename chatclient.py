@@ -21,8 +21,8 @@ except ConnectionRefusedError:
 	print("Did you use the order: hostname port requestedFile for the passed arguements?\nAre you using the correct host and port?")
 	sys.exit()
 
-# create a udp socket
-# get the addreess
+# create a udp socket for recieving message etc.
+udpSocket = socket(AF_INET, SOCK_DGRAM)
 
 serverSocket.send(username.encode())
 response = serverSocket.recv(4096).decode()
@@ -56,7 +56,12 @@ else:
 # send the address of the udp socket to the server
 # dispatch a thread that handles recieving messages
 # something like handle_messages(udp_socket)
+udpSocket.sendTo("udp begin".encode(), (hostname, port))
 
+#wait for server to send over tcp socket that it has recieved the udp message.
+while(response != "udp recieve") {
+	response = serverSocket.recv(4096).decode()
+}
 #just recieved operation***
 operating = True
 while operating:
@@ -94,3 +99,19 @@ while operating:
 		sys.exit()
 	else:
 		print("Unknown command.")
+
+def message_recieving_thread(udpSocket):
+	#listen for PM/DM being sent to this socket
+	#decide when to print?
+	
+	# maybe we should make a global queue that contains (message, address)
+	# this thread can simply recieve messages and add to the queue
+	# then the main thread above can decide when it is a "safe" time
+	# to print any pending messages, e.x. after a command is processed it will print all messages?
+	# we could even have a third 'printing' thread that handles printing for both the main operation thread and this thread 
+
+	while(True):
+		message, address = udpSocket.recvfrom(4096)
+		userFrom, address = udpSocket.recvfrom(4096)
+		#do something with message and username of sender.
+		#either print it out now, or add to queue to print when able

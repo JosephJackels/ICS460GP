@@ -11,12 +11,13 @@ port = (int) sys.argv[1]
 
 #create tcp socket
 serverSocket = socket(AF_INET, SOCK_STREAM)
-
+udpSocket = socket(AF_INET, SOCK_DGRAM)
 #get hostname ex. 127.0.1.1
 host = gethostbyname(gethostname())
 
-#bind host/port to socket
-serverSocket.bind((host,port))
+#bind host/port to sockets
+serverSocket.bind((host, port))
+udpSocket.bind((host, port))
 print("server listening at", host, "on port", port)
 serverSocket.listen(5)
 
@@ -26,7 +27,7 @@ maxConnections = 10
 connectionList = list() #[thread1, thread2, thread3...]
 
 #list of currently active users, along with their assigned socket
-activeUsers = list() #[(joe, joeSocket), (bill, billSocket), (beth, bethSocket)...]
+activeUsers = list() #[(joe, joeTcpSocket, joeUdpAddress), (bill, billSocket, billUdpAddress), (beth, bethSocket, bethUdpAddress)...]
 
 tempList = list() # for clearing /copying lists
 
@@ -144,15 +145,19 @@ def client_connection_thread(clientSocket):
 	#handling block
 	#user is logged in / registered
 	
-	#append them to active user list
-	userListMutex.acquire()
-	activeUsers.append((username, clientSocket))
-	userListMutex.release()
-	running = True
-	
-	#recieve from the tcp socket the address of the udp socket
+	# recieve message from the udp socket
 	# save somewhere in the active userList the udp address for sending messages to
 	# USERlIST WILL HAVE TO BE CHANGED TO SOMETHING LIKE (username, tcpSocket, udpSocket)
+	messageType, address = udpSocket.recvfrom(4096)
+
+	#append them to active user list
+	userListMutex.acquire()
+	activeUsers.append((username, clientSocket, address))
+	userListMutex.release()
+	running = True
+
+	#tell client that it has recievd the udp address and is ready to recieve commands.
+	clientSocket.send("udp recieve".encode())
 	
 	while running:
 		#prompt client for operation
@@ -174,7 +179,9 @@ def client_connection_thread(clientSocket):
 			userListMutex.acquire()
 			for userTuple in activeUsers:
 				if userTuple[0] != username:
-					userTuple[1].send(message.encode())
+					#userTuple[1].send(message.encode())
+					udpSocket.sendTo(message.encode(), userTuple[2])
+					udpSocket.sendTo(username.encode(), userTuple[2])
 			userListMutex.release()
 			clientSocket.send("complete".encode())
 			#return to wait for command
@@ -197,7 +204,7 @@ def client_connection_thread(clientSocket):
 				for userTuple in activeUsers:
 					if userTuple[0] == reciever:
 						found = True
-						recieverSocket = userTuple[1]
+						recieverAddress = userTuple[2]
 						break
 				userListMutex.release()
 
@@ -206,7 +213,9 @@ def client_connection_thread(clientSocket):
 				else:
 					clientSocket.send("message".encode())
 					message = clientSocket.recv(4096).decode()
-					recieverSocket.send(message.encode())
+					#recieverSocket.send(message.encode())
+					udpSocket.sendTo(message.encode(), recieverAddress)
+					udpSocket.sendTo(username.encode(), recieverAddress)
 					clientSocket.send("complete".encode())
 				#send client list of online users
 				#wait for username AND message
