@@ -152,6 +152,14 @@ while operating:
 				print("Invalid response?")
 		
 	elif command == "EX":
+		
+		while not messageQueue.empty():
+			messageTuple = messageQueue.get()
+			print("\n*** New Message ***")
+			print("Message type: " + messageTuple[2])
+			print("From: " + messageTuple[1] + "\n")
+			print(messageTuple[0] + "\n")
+		
 		operating = False
 		print("Sending logout command to server")
 		serverSocket.send(command.encode())
