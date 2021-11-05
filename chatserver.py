@@ -1,13 +1,13 @@
 from socket import *
 import sys
 import threading
-
+import time
 #check that correct amount of paramaters are given
 if len(sys.argv) < 2:
 	print("please start server via $python3 chatserver.py port")
 	sys.exit()
 #set port variable
-port = (int) sys.argv[1]
+port = int(sys.argv[1])
 
 #create tcp socket
 serverSocket = socket(AF_INET, SOCK_STREAM)
@@ -15,10 +15,20 @@ udpSocket = socket(AF_INET, SOCK_DGRAM)
 #get hostname ex. 127.0.1.1
 host = gethostbyname(gethostname())
 
-#bind host/port to sockets
-serverSocket.bind((host, port))
-udpSocket.bind((host, port))
-print("server listening at", host, "on port", port)
+connected = False
+print("Attempting to bind host/port to sockets", end="", flush=True)
+while not connected:
+	#bind host/port to sockets
+	try:
+		connected = True
+		serverSocket.bind((host, port))
+		udpSocket.bind((host, port))
+	except OSError:
+		connected = False
+		print(".", end="", flush=True)
+		time.sleep(3)
+
+print("\nserver listening at", host, "on port", port)
 serverSocket.listen(5)
 
 maxConnections = 10
@@ -42,10 +52,14 @@ fileMutex = threading.Lock()
 #attempt to read in credentials from file credentials.txt
 try:
 	credentialFile = open('credentials.txt', 'r')
-	lines = credentialFile.readLines()
+	lines = credentialFile.readlines()
 	for line in lines:
 		line = line.strip()#line = user pass
-		credentialList.append((line.split()[0], line.split()[1]))#add (user, pass) to credential list
+		if line == "\n":
+			#End of file
+			line = ""
+		else:
+			credentialList.append((line.split()[0], line.split()[1]))#add (user, pass) to credential list
 	credentialFile.close()
 except IOError:
 	#File not found, try to create file
@@ -121,6 +135,8 @@ def client_connection_thread(clientSocket):
 				else:
 					#tell client password is incorrect, allow to try again
 					clientSocket.send("refused".encode())
+			else:
+				clientSocket.send("accepted".encode())
 	else:
 		#acknowledge client is new
 		clientSocket.send("new".encode())
@@ -134,7 +150,7 @@ def client_connection_thread(clientSocket):
 
 		#register - add to file AND update credentialList
 		fileMutex.acquire()
-		file = open('credential.txt', a)
+		file = open('credentials.txt', 'a')
 		file.write("\n")
 		file.write(username + " " + password)
 		file.close()
@@ -161,7 +177,7 @@ def client_connection_thread(clientSocket):
 	
 	while running:
 		#prompt client for operation
-		clientSocket.send("operation".encode())
+		#clientSocket.send("operation".encode())
 		
 		#wait for command
 		operation = clientSocket.recv(4096).decode()
@@ -180,8 +196,9 @@ def client_connection_thread(clientSocket):
 			for userTuple in activeUsers:
 				if userTuple[0] != username:
 					#userTuple[1].send(message.encode())
-					udpSocket.sendTo(message.encode(), userTuple[2])
-					udpSocket.sendTo(username.encode(), userTuple[2])
+					udpSocket.sendto(message.encode(), userTuple[2])
+					udpSocket.sendto(username.encode(), userTuple[2])
+					udpSocket.sendto("Public Message (PM)".encode(), userTuple[2])
 			userListMutex.release()
 			clientSocket.send("complete".encode())
 			#return to wait for command
@@ -190,33 +207,48 @@ def client_connection_thread(clientSocket):
 			#DM
 				#acknowledge DM request
 				clientSocket.send("DM".encode())
-				userListMutex.acquire()
-				for userTuple in activeUsers:
-					clientSocket.send(userTuple[0].encode())
-				userListMutex.release()
-
-				clientSocket.send("END")
-				reciever = clientSocket.recv(4096).decode()
-
-				found = False
+				message = clientSocket.recv(4096).decode()
+				if(message != "received"):
+					print("Error handshaking?")
+					print(message)
 				
-				userListMutex.acquire()
-				for userTuple in activeUsers:
-					if userTuple[0] == reciever:
-						found = True
-						recieverAddress = userTuple[2]
-						break
-				userListMutex.release()
+				gettingUser = True
+				while gettingUser:
+					userListMutex.acquire()
+					for userTuple in activeUsers:
+						clientSocket.send(userTuple[0].encode())
+						message = clientSocket.recv(4096).decode()
+						if(message != "received"):
+							print("client did not receive username properly")
+					userListMutex.release()
 
-				if not found:
-					clientSocket.send("DNE".encode())
-				else:
-					clientSocket.send("message".encode())
-					message = clientSocket.recv(4096).decode()
-					#recieverSocket.send(message.encode())
-					udpSocket.sendTo(message.encode(), recieverAddress)
-					udpSocket.sendTo(username.encode(), recieverAddress)
-					clientSocket.send("complete".encode())
+					clientSocket.send("END".encode())
+					reciever = clientSocket.recv(4096).decode()
+
+					found = False
+				
+					userListMutex.acquire()
+					for userTuple in activeUsers:
+						if userTuple[0] == reciever:
+							found = True
+							recieverAddress = userTuple[2]
+							break
+					userListMutex.release()
+
+					if not found:
+						clientSocket.send("DNE".encode())
+						message = clientSocket.recv(4096).decode()
+						if(message != "received"):
+							print("Error receving DNE?")
+					else:
+						gettingUser = False
+						clientSocket.send("message".encode())
+						message = clientSocket.recv(4096).decode()
+						#recieverSocket.send(message.encode())
+						udpSocket.sendto(message.encode(), recieverAddress)
+						udpSocket.sendto(username.encode(), recieverAddress)
+						udpSocket.sendto("Direct Message (DM)".encode(), recieverAddress)
+						clientSocket.send("complete".encode())
 				#send client list of online users
 				#wait for username AND message
 				#check that user exists and is online
@@ -238,6 +270,7 @@ def client_connection_thread(clientSocket):
 				#close socket
 				#update list of logged in threads
 				#client closes it's own socket
+				#allow this thread to end by exiting while loop and reaching end of the function
 
 		else:
 			clientSocket.send("unknown".encode())
@@ -255,7 +288,7 @@ while True:
 			connectionList = tempList.copy()
 	
 	#wait for new connection
-	newConnection, addr = mainSocket.accept()
+	newConnection, addr = serverSocket.accept()
 		
 	#create thread, add to list of threads, start new thread
 	newThread = threading.Thread(target=client_connection_thread, args=(newConnection,))
