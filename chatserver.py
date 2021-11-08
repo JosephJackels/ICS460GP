@@ -2,6 +2,7 @@ from socket import *
 import sys
 import threading
 import time
+import os.path
 #check that correct amount of paramaters are given
 if len(sys.argv) < 2:
 	print("please start server via $python3 chatserver.py port")
@@ -55,11 +56,7 @@ try:
 	lines = credentialFile.readlines()
 	for line in lines:
 		line = line.strip()#line = user pass
-		if line == "\n":
-			#End of file
-			line = ""
-		else:
-			credentialList.append((line.split()[0], line.split()[1]))#add (user, pass) to credential list
+		credentialList.append((line.split()[0], line.split()[1]))#add (user, pass) to credential list
 	credentialFile.close()
 except IOError:
 	#File not found, try to create file
@@ -148,10 +145,13 @@ def client_connection_thread(clientSocket):
 		message = "News User: " + username + " Password: " + password
 		clientSocket.send(message.encode())
 
+		fileExists = os.path.isfile('credentials.txt')
+		fileEmpty = (os.path.getsize('credentials.txt') == 0)#number of bytes?
 		#register - add to file AND update credentialList
 		fileMutex.acquire()
 		file = open('credentials.txt', 'a')
-		file.write("\n")
+		if fileExists and not fileEmpty:
+			file.write("\n")
 		file.write(username + " " + password)
 		file.close()
 		fileMutex.release()

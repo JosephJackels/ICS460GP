@@ -21,6 +21,24 @@ def message_recieving_thread(udpSocket):
 		#do something with message and username of sender.
 		#either print it out now, or add to queue to print when able
 
+def input_listener_thread():
+	global inputCommand
+	global inputReadyFlag
+
+	inputCommand = input("Please enter a command:\n\tPM - public message to all active users.\n\tDM - direct message to a  single user\n\tEX - exit program and logout of account\n")
+	inputReadyFlag = True
+
+def print_messages(waitingForCommand):
+	global messageQueue
+	while not messageQueue.empty():
+		messageTuple = messageQueue.get()
+		print("\n*** New Message ***")
+		print("Message type: " + messageTuple[2])
+		print("From: " + messageTuple[1] + "\n")
+		print(messageTuple[0] + "\n")
+		if waitingForCommand:
+			print("Please enter a command:\n\tPM - public message to all active users.\n\tDM - direct message to a  single user\n\tEX - exit program and logout of account\n")
+
 if len(sys.argv) < 4:
 	print("Start the client via $python3 chatclient.py hostname port username")
 	sys.exit()
@@ -49,6 +67,7 @@ response = serverSocket.recv(4096).decode()
 if response == "existing":
 	approved = False
 	password = input("Existing user. Please enter password:\n")
+
 	while not approved:
 		serverSocket.send(password.encode())
 		response = serverSocket.recv(4096).decode()
@@ -62,6 +81,10 @@ if response == "existing":
 			approved = True
 elif response == "new":
 	password = input("Welcome new user: " + username + " please enter a new password:\n")
+
+	while " " in password:
+		password = input("Password cannot contain \' \' character. Please re-enter a new password that does not cntain a space.")
+		
 	serverSocket.send(password.encode())
 	response = serverSocket.recv(4096).decode()
 	print(response)
@@ -95,7 +118,15 @@ messageListenerThread.start()
 operating = True
 while operating:
 
-	command = input("Please enter a command:\n\tPM - public message to all active users.\n\tDM - direct message to a  single user\n\tEX - exit program and logout of account\n")
+	inputReadyFlag = False
+	inputCommand = ""
+	inputListenerThread = threading.Thread(target=input_listener_thread, daemon=True)
+	inputListenerThread.start()
+
+	while(not inputReadyFlag):
+		print_messages(True)
+
+	command = inputCommand
 
 	if command == "PM":
 		serverSocket.send(command.encode())
@@ -153,13 +184,8 @@ while operating:
 		
 	elif command == "EX":
 		
-		while not messageQueue.empty():
-			messageTuple = messageQueue.get()
-			print("\n*** New Message ***")
-			print("Message type: " + messageTuple[2])
-			print("From: " + messageTuple[1] + "\n")
-			print(messageTuple[0] + "\n")
-		
+		print_messages(False)
+
 		operating = False
 		print("Sending logout command to server")
 		serverSocket.send(command.encode())
@@ -175,12 +201,3 @@ while operating:
 		sys.exit()
 	else:
 		print("Unknown command.")
-
-	# end of recieving command
-	# print all pending messages from recieving thread?
-	while not messageQueue.empty():
-		messageTuple = messageQueue.get()
-		print("\n*** New Message ***")
-		print("Message type: " + messageTuple[2])
-		print("From: " + messageTuple[1] + "\n")
-		print(messageTuple[0] + "\n")
