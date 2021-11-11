@@ -72,7 +72,7 @@ if response == "existing":
 		serverSocket.send(password.encode())
 		response = serverSocket.recv(4096).decode()
 		if response == "refused":
-			password = input("Incorrect password, please try again")
+			password = input("Incorrect password, please try again:\n")
 		elif response == "final refuse":
 			print("Password refused too many times. exiting program")
 			serverSocket.close()
@@ -83,8 +83,8 @@ elif response == "new":
 	password = input("Welcome new user: " + username + " please enter a new password:\n")
 
 	while " " in password:
-		password = input("Password cannot contain \' \' character. Please re-enter a new password that does not cntain a space.")
-		
+		password = input("Password cannot contain \' \' character. Please re-enter a new password that does not contain a space:\n")
+
 	serverSocket.send(password.encode())
 	response = serverSocket.recv(4096).decode()
 	print(response)
