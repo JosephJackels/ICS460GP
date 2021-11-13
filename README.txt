@@ -59,7 +59,15 @@ Files present:
 		- newly created users will have their credentials appended to the file by the server
 
 Running the program:
-
+	chatserver.py:
+		-Run the commandline: python3 chatserver.py <port>
+			-port, the argument specified by the server creator such as "command prompt>$python3 chatserver.py 1300"
+		-The server displays the ready and running status to receive message(s) and the server's host for connection.
+	chatclient.py:
+		-python3 chatclient.py <host> <port> <username>
+			-host , the IP address of the server required to establish connection
+			-port, the port of the server required to establish connection
+			-username, the username of the chat program
 Example Output:
 
 Citations:
