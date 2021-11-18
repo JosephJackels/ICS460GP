@@ -12,7 +12,7 @@ port = int(sys.argv[1])
 
 #create tcp socket
 serverSocket = socket(AF_INET, SOCK_STREAM)
-udpSocket = socket(AF_INET, SOCK_DGRAM)
+#udpSocket = socket(AF_INET, SOCK_DGRAM)
 #get hostname ex. 127.0.1.1
 host = gethostbyname(gethostname())
 
@@ -23,7 +23,7 @@ while not connected:
 	try:
 		connected = True
 		serverSocket.bind((host, port))
-		udpSocket.bind((host, port))
+		#udpSocket.bind((host, port))
 	except OSError:
 		connected = False
 		print(".", end="", flush=True)
@@ -38,12 +38,12 @@ maxConnections = 10
 connectionList = list() #[thread1, thread2, thread3...]
 
 #list of currently active users, along with their assigned socket
-activeUsers = list() #[(joe, joeTcpSocket, joeUdpAddress), (bill, billSocket, billUdpAddress), (beth, bethSocket, bethUdpAddress)...]
+activeUsers = list() #[(joe, joeTcpSocket), (bill, billSocket), (beth, bethSocket)...]
 
 tempList = list() # for clearing /copying lists
 
 #list of saved username/password pairs
-credentialList = list() #[(joe, password), (bill, password1), (beth, password2)] READ IN FROM FILE
+credentialList = list() #[(joe, password), (bill, password1), (beth, password2)] READ IN FROM FILE (if available)
 
 #mutexes (mutual exclusion locks) for accessing relevent lists without threading issues
 userListMutex = threading.Lock()
@@ -66,20 +66,37 @@ except IOError:
 		#can't create file, possible permissions error
 		print("Error creating file. Are you allowed to?")
 
-def send_message(messageType, socket, message):
-	#sends either a data message or operation message over the supplied socket
-	#data message will send "DATA" then the message
+def send_op_message(socket, message):
+	#sends an operation message over the supplied socket
 	#operation messages will send "OP" then the message
+	#handshaking to ensure each message is recieved
 
-	socket.send(messageType.encode())
+	socket.send("OP".encode())
 	response = socket.recv(4096).decode()
-	if(response != "OK"):
-		print("Something went wrong sending messageType")
+	if(response != "OP"):
+		print("Something went wrong sending operation code")
 	else:
 		socket.send(message.encode())
 		response = socket.recv(4096).decode()
 		if(response != "OK"):
-			print("Something went wrong sending message")
+			print("Something went wrong sending operation message")
+
+def send_data_message(socket, message, userFrom, messageType):
+	socket.send("DATA".encode())
+	response = socket.recv(4096).decode()
+	if(response != "DATA"):
+		print("Error sending data")
+	else:
+		socket.send(message.encode())
+		response = socket.recv(4096).decode()
+		if(response == "OK"):
+			socket.send(userFrom.encode())
+			response = socket.recv(4096).decode()
+			if(response == "OK"):
+				socket.send(messageType.encode())
+				response = socket.recv(4096).decode()
+				if(response != "OK"):
+					print("Error sending message")
 
 #function used by client threads
 def client_connection_thread(clientSocket):
@@ -202,7 +219,7 @@ def client_connection_thread(clientSocket):
 			#send acknowledgement of PM request
 			#prompt for message
 			#clientSocket.send("PM".encode())
-			send_message("OP", clientSocket, "PM")
+			send_op_message(clientSocket, "PM")
 			#wait for message
 			message = clientSocket.recv(4096).decode()
 
@@ -212,22 +229,20 @@ def client_connection_thread(clientSocket):
 			for userTuple in activeUsers:
 				if userTuple[0] != username:
 					#userTuple[1].send(message.encode())
-					send_message("DATA", userTuple[1], message)
-					send_message("DATA", userTuple[1], username)
-					send_message("DATA", userTuple[1], "Public Message (PM)")
+					send_data_message(userTuple[1], message, username, "Public Message (PM)")
 					#udpSocket.sendto(message.encode(), userTuple[2])
 					#udpSocket.sendto(username.encode(), userTuple[2])
 					#udpSocket.sendto("Public Message (PM)".encode(), userTuple[2])
 			userListMutex.release()
 			#clientSocket.send("complete".encode())
-			send_message("OP",clientSocket, "complete")
+			send_op_message(clientSocket, "complete")
 			#return to wait for command
 
 		elif operation == "DM":
 			#DM
 				#acknowledge DM request
 				#clientSocket.send("DM".encode())
-				send_message("OP", clientSocket, "DM")
+				send_op_message(clientSocket, "DM")
 				message = clientSocket.recv(4096).decode()
 				if(message != "received"):
 					print("Error handshaking?")
@@ -237,13 +252,15 @@ def client_connection_thread(clientSocket):
 				while gettingUser:
 					userListMutex.acquire()
 					for userTuple in activeUsers:
-						clientSocket.send(userTuple[0].encode())
+						#clientSocket.send(userTuple[0].encode())
+						send_op_message(clientSocket, userTuple[0])
 						message = clientSocket.recv(4096).decode()
 						if(message != "received"):
 							print("client did not receive username properly")
 					userListMutex.release()
 
-					clientSocket.send("END".encode())
+					#clientSocket.send("END".encode())
+					send_op_message(clientSocket, "END")
 					reciever = clientSocket.recv(4096).decode()
 
 					found = False
@@ -252,24 +269,28 @@ def client_connection_thread(clientSocket):
 					for userTuple in activeUsers:
 						if userTuple[0] == reciever:
 							found = True
-							recieverAddress = userTuple[2]
+							recieverSocket = userTuple[1]
 							break
 					userListMutex.release()
 
 					if not found:
-						clientSocket.send("DNE".encode())
+						#clientSocket.send("DNE".encode())
+						send_op_message(clientSocket, "DNE")
 						message = clientSocket.recv(4096).decode()
 						if(message != "received"):
 							print("Error receving DNE?")
 					else:
 						gettingUser = False
-						clientSocket.send("message".encode())
+						#clientSocket.send("message".encode())
+						send_op_message(clientSocket, "message")
 						message = clientSocket.recv(4096).decode()
 						#recieverSocket.send(message.encode())
-						udpSocket.sendto(message.encode(), recieverAddress)
-						udpSocket.sendto(username.encode(), recieverAddress)
-						udpSocket.sendto("Direct Message (DM)".encode(), recieverAddress)
-						clientSocket.send("complete".encode())
+						send_data_message(recieverSocket, message, username, "Direct Message (DM)")
+						#udpSocket.sendto(message.encode(), recieverAddress)
+						#udpSocket.sendto(username.encode(), recieverAddress)
+						#udpSocket.sendto("Direct Message (DM)".encode(), recieverAddress)
+						#clientSocket.send("complete".encode())
+						send_op_message(clientSocket, "complete")
 				#send client list of online users
 				#wait for username AND message
 				#check that user exists and is online
@@ -285,7 +306,8 @@ def client_connection_thread(clientSocket):
 					activeUsers.remove(userTuple)
 					break
 			userListMutex.release()
-			clientSocket.send("logout".encode())
+			#clientSocket.send("logout".encode())
+			send_op_message(clientSocket, "logout")
 			clientSocket.close()
 			#EX
 				#close socket
@@ -294,7 +316,8 @@ def client_connection_thread(clientSocket):
 				#allow this thread to end by exiting while loop and reaching end of the function
 
 		else:
-			clientSocket.send("unknown".encode())
+			#clientSocket.send("unknown".encode())
+			send_op_message(clientSocket, "unkown")
 			#unknown
 
 

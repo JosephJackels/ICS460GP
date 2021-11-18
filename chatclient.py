@@ -2,8 +2,10 @@ from socket import *
 import sys, threading, queue
 
 #recieve thread
-def message_recieving_thread(udpSocket):
+def message_recieving_thread(tcpSocket):
 	global messageQueue
+	global operationReadyFlag
+	global currentOperationMessage
 	#listen for PM/DM being sent to this socket
 	#decide when to print?
 	
@@ -14,18 +16,37 @@ def message_recieving_thread(udpSocket):
 	# we could even have a third 'printing' thread that handles printing for both the main operation thread and this thread 
 
 	while True:
-		message, address = udpSocket.recvfrom(4096)
-		userFrom, address = udpSocket.recvfrom(4096)
-		messageType, address = udpSocket.recvfrom(4096)
-		messageQueue.put((message.decode(), userFrom.decode(), messageType.decode()))
+		messageType = tcpSocket.recv(4096).decode()
+		if messageType == "OP":
+			#
+			tcpSocket.send("OP".encode())
+			currentOperationMessage = tcpSocket.recv(4096).decode()
+			tcpSocket.send("OK".encode())
+			operationReadyFlag = True
+
+		elif messageType.decode() == "DATA":
+			#
+			tcpSocket.send("DATA".encode())
+			message = tcpSocket.recv(4096).decode()
+			tcpSocket.send("OK".encode())
+			userFrom = tcpSocket.recv(4096).decode()
+			tcpSocket.send("OK".encode())
+			messageType = tcpSocket.recv(4096).decode()
+			tcpSocket.send("OK".encode())
+
+			messageQueue.put(message, userFrom, messageType)
+		#message, address = udpSocket.recvfrom(4096)
+		#userFrom, address = udpSocket.recvfrom(4096)
+		#messageType, address = udpSocket.recvfrom(4096)
+		#messageQueue.put((message.decode(), userFrom.decode(), messageType.decode()))
 		#do something with message and username of sender.
 		#either print it out now, or add to queue to print when able
 
 def input_listener_thread():
-	global inputCommand
+	global command
 	global inputReadyFlag
 
-	inputCommand = input("Please enter a command:\n\tPM - public message to all active users.\n\tDM - direct message to a  single user\n\tEX - exit program and logout of account\n")
+	command = input("Please enter a command:\n\tPM - public message to all active users.\n\tDM - direct message to a  single user\n\tEX - exit program and logout of account\n")
 	inputReadyFlag = True
 
 def print_messages(waitingForCommand):
@@ -38,6 +59,16 @@ def print_messages(waitingForCommand):
 		print(messageTuple[0] + "\n")
 		if waitingForCommand:
 			print("Please enter a command:\n\tPM - public message to all active users.\n\tDM - direct message to a  single user\n\tEX - exit program and logout of account\n")
+
+def get_operation():
+	global operationReadyFlag
+	global currentOperationMessage
+	
+	while(not operationReadyFlag):
+		print_messages(False)
+	operationReadyFlag = False
+
+	return currentOperationMessage
 
 if len(sys.argv) < 4:
 	print("Start the client via $python3 chatclient.py hostname port username")
@@ -59,7 +90,7 @@ except ConnectionRefusedError:
 	sys.exit()
 
 # create a udp socket for recieving message etc.
-udpSocket = socket(AF_INET, SOCK_DGRAM)
+#udpSocket = socket(AF_INET, SOCK_DGRAM)
 
 serverSocket.send(username.encode())
 response = serverSocket.recv(4096).decode()
@@ -101,49 +132,56 @@ else:
 # send the address of the udp socket to the server
 # dispatch a thread that handles recieving messages
 # something like handle_messages(udp_socket)
-udpSocket.sendto("udp begin".encode(), (hostname, port))
+#udpSocket.sendto("udp begin".encode(), (hostname, port))
 
 #wait for server to send over tcp socket that it has recieved the udp message.
-response = serverSocket.recv(4096).decode()
-if(response != "udp recieve"):
-	print("Error receiving udp?")
-	print(response)
+#response = serverSocket.recv(4096).decode()
+#if(response != "udp recieve"):
+	#print("Error receiving udp?")
+	#print(response)
 
 stopEvent = threading.Event()
 #begin messageListening thread
-messageListenerThread = threading.Thread(target=message_recieving_thread, args=(udpSocket,), daemon=True)
+messageListenerThread = threading.Thread(target=message_recieving_thread, args=(serverSocket,), daemon=True)
 messageListenerThread.start()
 
 #just recieved operation***
+operationReadyFlag = False
+currentOperationMessage = ""
 operating = True
 while operating:
 
 	inputReadyFlag = False
-	inputCommand = ""
+	command = ""
 	inputListenerThread = threading.Thread(target=input_listener_thread, daemon=True)
 	inputListenerThread.start()
 
 	while(not inputReadyFlag):
 		print_messages(True)
 
-	command = inputCommand
-
+	
 	if command == "PM":
 		serverSocket.send(command.encode())
-		response = serverSocket.recv(4096).decode()
+		
+		response = get_operation()
+
 		if response != "PM":
 			print("Did not recognize PM request?")
 
 		#ask for message
 		message = input("Message:\n")
 		serverSocket.send(message.encode())
-		response = serverSocket.recv(4096).decode()
+		
+		response = get_operation()
+
 		if response != "complete":
 			print("message wasn't sent?")
 
 	elif command == "DM":
 		serverSocket.send(command.encode())
-		response = serverSocket.recv(4096).decode()
+		
+		response = get_operation()
+
 		if response != "DM":
 			print("Server did not recieve DM request properly?")
 			
@@ -153,12 +191,13 @@ while operating:
 		while gettingUser:
 
 			print("Select a user to send a message to:")
-			response = serverSocket.recv(4096).decode()
+			
+			response = get_operation()
 		
 			while response != "END":
-				print("\t" + response)
+				print("\t" + currentOperationMessage)
 				serverSocket.send("received".encode())
-				response = serverSocket.recv(4096).decode()
+				response = get_operation()
 		
 			sendTo = input("To:\n")
 			serverSocket.send(sendTo.encode())
