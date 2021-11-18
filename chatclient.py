@@ -24,7 +24,7 @@ def message_recieving_thread(tcpSocket):
 			tcpSocket.send("OK".encode())
 			operationReadyFlag = True
 
-		elif messageType.decode() == "DATA":
+		elif messageType == "DATA":
 			#
 			tcpSocket.send("DATA".encode())
 			message = tcpSocket.recv(4096).decode()
@@ -33,7 +33,9 @@ def message_recieving_thread(tcpSocket):
 			tcpSocket.send("OK".encode())
 			messageType = tcpSocket.recv(4096).decode()
 			tcpSocket.send("OK".encode())
-
+			print(message)
+			print(userFrom)
+			print(messageType)
 			messageQueue.put(message, userFrom, messageType)
 		#message, address = udpSocket.recvfrom(4096)
 		#userFrom, address = udpSocket.recvfrom(4096)
@@ -201,7 +203,7 @@ while operating:
 		
 			sendTo = input("To:\n")
 			serverSocket.send(sendTo.encode())
-			response = serverSocket.recv(4096).decode()
+			response = get_operation()
 		
 			if(response == "DNE"):
 				#handle Does Not Exist
@@ -213,11 +215,11 @@ while operating:
 				#get message input, send it etc.
 				message = input("\nEnter message:\n")
 				serverSocket.send(message.encode())
-				response = serverSocket.recv(4096).decode()
-				if(response != "complete"):
-					print("Something went wrong")
-				else:
+				response = get_operation()
+				if(response == "complete"):
 					print("Message sent")
+				else:
+					print("Something went wrong")
 			else:
 				print("Invalid response?")
 		
@@ -228,7 +230,7 @@ while operating:
 		operating = False
 		print("Sending logout command to server")
 		serverSocket.send(command.encode())
-		response = serverSocket.recv(4096).decode()
+		response = get_operation()
 		
 		if response == "logout":
 			print("successfully logged out. Closing client side socket and ending program.")
@@ -236,7 +238,7 @@ while operating:
 			print("Error logging out??? closing socket anyways")
 
 		serverSocket.close()
-		udpSocket.close()
+		#udpSocket.close()
 		sys.exit()
 	else:
 		print("Unknown command.")
