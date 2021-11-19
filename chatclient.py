@@ -33,10 +33,8 @@ def message_recieving_thread(tcpSocket):
 			tcpSocket.send("OK".encode())
 			messageType = tcpSocket.recv(4096).decode()
 			tcpSocket.send("OK".encode())
-			print(message)
-			print(userFrom)
-			print(messageType)
-			messageQueue.put(message, userFrom, messageType)
+			
+			messageQueue.put((message, userFrom, messageType))
 		#message, address = udpSocket.recvfrom(4096)
 		#userFrom, address = udpSocket.recvfrom(4096)
 		#messageType, address = udpSocket.recvfrom(4096)
@@ -112,6 +110,7 @@ if response == "existing":
 			sys.exit()
 		else:
 			approved = True
+			serverSocket.send("OK".encode())
 elif response == "new":
 	password = input("Welcome new user: " + username + " please enter a new password:\n")
 
@@ -121,6 +120,7 @@ elif response == "new":
 	serverSocket.send(password.encode())
 	response = serverSocket.recv(4096).decode()
 	print(response)
+	serverSocket.send("OK".encode())
 
 elif response == "inuse":
 	print("That user is already actively logged in. Please restart the program as a different user")
@@ -152,7 +152,9 @@ operationReadyFlag = False
 currentOperationMessage = ""
 operating = True
 while operating:
-
+	response = get_operation()
+	if(response != "command"):
+		print("did not get command")
 	inputReadyFlag = False
 	command = ""
 	inputListenerThread = threading.Thread(target=input_listener_thread, daemon=True)
@@ -166,7 +168,7 @@ while operating:
 		serverSocket.send(command.encode())
 		
 		response = get_operation()
-
+		print(response)
 		if response != "PM":
 			print("Did not recognize PM request?")
 
@@ -178,6 +180,8 @@ while operating:
 
 		if response != "complete":
 			print("message wasn't sent?")
+		else:
+			print("message sent")
 
 	elif command == "DM":
 		serverSocket.send(command.encode())
@@ -238,7 +242,6 @@ while operating:
 			print("Error logging out??? closing socket anyways")
 
 		serverSocket.close()
-		#udpSocket.close()
 		sys.exit()
 	else:
 		print("Unknown command.")
