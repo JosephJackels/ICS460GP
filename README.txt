@@ -88,8 +88,8 @@ Example Output:
             PM - public message to all active users.
             DM - direct message to a  single user
             EX - exit program and logout of account
-    -Public Message Sent:
-      Client 1:
+    -Public Message(PM):
+      Client 1(renew):
         PM
         Message:
         Hello guys
@@ -109,4 +109,35 @@ Example Output:
               PM - public message to all active users.
               DM - direct message to a  single user
               EX - exit program and logout of account
+    -Direct Message(DM):
+      Client 1(renew):
+         DM
+         Select a user to send a message to:
+                  bob
+                  joe
+                  renew
+         To:
+	 joe
+	 Enter message:
+         Hello joe
+         Message sent
+         Please enter a command:
+                PM - public message to all active users.
+                DM - direct message to a  single user
+                EX - exit program and logout of account
+      Client 2(joe):
+         *** New Message ***
+         Message type: Direct Message (DM)
+         From: renew
+
+         Hello joe
+
+         Please enter a command:
+                PM - public message to all active users.
+                DM - direct message to a  single user
+                EX - exit program and logout of account
+     -Exit(EX):
+        EX
+        Sending logout command to server
+        successfully logged out. Closing client side socket and ending program.
 Citations:
