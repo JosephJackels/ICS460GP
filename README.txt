@@ -81,11 +81,32 @@ Example Output:
               PM - public message to all active users.
               DM - direct message to a  single user
               EX - exit program and logout of account
-    -Existing User Logging in
+    -Existing User Logging in:
       Existing user. Please enter password:
       bob
       Please enter a command:
             PM - public message to all active users.
             DM - direct message to a  single user
             EX - exit program and logout of account
+    -Public Message Sent:
+      Client 1:
+        PM
+        Message:
+        Hello guys
+        Message sent
+        Please enter a command:
+              PM - public message to all active users.
+              DM - direct message to a  single user
+              EX - exit program and logout of account
+      All Active User(s):
+        *** New Message ***
+        Message type: Public Message (PM)
+        From: renew
+
+        Hello guys
+
+        Please enter a command:
+              PM - public message to all active users.
+              DM - direct message to a  single user
+              EX - exit program and logout of account
 Citations:
