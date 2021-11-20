@@ -69,8 +69,7 @@ Running the program:
 			-port, the port of the server required to establish connection
 			-username, the username of the chat program
 Example Output:
-       prompt>$python3 chatserver.py 10000
-Output:
+    -Server Connection Output: prompt>$python3 chatserver.py 10000
        Attempting to bind host/port to sockets
        server listening at 10.0.0.114 on port 10000
        Server ready to recieve connections
