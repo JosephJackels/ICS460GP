@@ -73,4 +73,13 @@ Example Output:
        Attempting to bind host/port to sockets
        server listening at 10.0.0.114 on port 10000
        Server ready to recieve connections
+    -New User Logging in Output: prompt>$python3 chatclient.py 10.0.0.224 10000 renew
+       Welcome new user: renew please enter a new password:
+     -Input
+       re
+       News User: renew Password: re
+       Please enter a command:
+              PM - public message to all active users.
+              DM - direct message to a  single user
+              EX - exit program and logout of account
 Citations:
