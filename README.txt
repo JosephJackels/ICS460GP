@@ -140,4 +140,9 @@ Example Output:
         EX
         Sending logout command to server
         successfully logged out. Closing client side socket and ending program.
+
 Citations:
+	https://docs.python.org/3/howto/sockets.html
+	https://realpython.com/python-sockets/
+	https://www.geeksforgeeks.org/socket-programming-python/
+	https://pymotw.com/2/socket/tcp.html
