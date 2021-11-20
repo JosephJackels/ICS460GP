@@ -21,14 +21,28 @@ def message_recieving_thread(udpSocket):
 		#do something with message and username of sender.
 		#either print it out now, or add to queue to print when able
 
-def input_listener_thread():
+def input_listener_thread(prompt):
 	global inputCommand
 	global inputReadyFlag
 
-	inputCommand = input("Please enter a command:\n\tPM - public message to all active users.\n\tDM - direct message to a  single user\n\tEX - exit program and logout of account\n")
+	inputCommand = input(prompt)
 	inputReadyFlag = True
 
-def print_messages(waitingForCommand):
+def get_input(prompt):
+	global inputReadyFlag
+	global inputCommand
+	inputReadyFlag = False
+	inputCommand = ""
+
+	inputListenerThread = threading.Thread(target=input_listener_thread, args=(prompt,), daemon=True)
+	inputListenerThread.start()
+	
+	while(not inputReadyFlag):
+		print_messages(prompt)
+	inputReadyFlag = False
+	return inputCommand
+
+def print_messages(prompt):
 	global messageQueue
 	while not messageQueue.empty():
 		messageTuple = messageQueue.get()
@@ -36,8 +50,27 @@ def print_messages(waitingForCommand):
 		print("Message type: " + messageTuple[2])
 		print("From: " + messageTuple[1] + "\n")
 		print(messageTuple[0] + "\n")
-		if waitingForCommand:
-			print("Please enter a command:\n\tPM - public message to all active users.\n\tDM - direct message to a  single user\n\tEX - exit program and logout of account\n")
+		print(prompt)
+
+def get_response(socket, prompt):
+	global responseReadyFlag
+	global socketResponse
+	responseReadyFlag = False
+	socketResponse = ""
+
+	socketResponseListener = threading.Thread(target=response_listener_thread, args=(serverSocket,), daemon=True)
+	socketResponseListener.start()
+
+	while(not responseReadyFlag):
+		print_messages(prompt)
+	responseReadyFlag = False
+	return socketResponse
+
+def response_listener_thread(socket):
+	global responseReadyFlag
+	global socketResponse
+	socketResponse = socket.recv(4096).decode()
+	responseReadyFlag = True
 
 if len(sys.argv) < 4:
 	print("Start the client via $python3 chatclient.py hostname port username")
@@ -114,36 +147,36 @@ stopEvent = threading.Event()
 messageListenerThread = threading.Thread(target=message_recieving_thread, args=(udpSocket,), daemon=True)
 messageListenerThread.start()
 
+responseReadyFlag = False
+socketResponse = ""
+
+inputReadyFlag = False
+inputCommand = ""
+
 #just recieved operation***
 operating = True
 while operating:
 
-	inputReadyFlag = False
-	inputCommand = ""
-	inputListenerThread = threading.Thread(target=input_listener_thread, daemon=True)
-	inputListenerThread.start()
-
-	while(not inputReadyFlag):
-		print_messages(True)
-
-	command = inputCommand
+	command = get_input("Please enter a command:\n\tPM - public message to all active users.\n\tDM - direct message to a  single user\n\tEX - exit program and logout of account\n")
 
 	if command == "PM":
 		serverSocket.send(command.encode())
-		response = serverSocket.recv(4096).decode()
+		response = get_response(serverSocket, "")
 		if response != "PM":
 			print("Did not recognize PM request?")
 
 		#ask for message
-		message = input("Message:\n")
+		message = get_input("Message:\n")
 		serverSocket.send(message.encode())
-		response = serverSocket.recv(4096).decode()
+		response = get_response(serverSocket, "")
 		if response != "complete":
 			print("message wasn't sent?")
+		else:
+			print("Message sent")
 
 	elif command == "DM":
 		serverSocket.send(command.encode())
-		response = serverSocket.recv(4096).decode()
+		response = get_response(serverSocket, "")
 		if response != "DM":
 			print("Server did not recieve DM request properly?")
 			
@@ -153,16 +186,16 @@ while operating:
 		while gettingUser:
 
 			print("Select a user to send a message to:")
-			response = serverSocket.recv(4096).decode()
+			response = get_response(serverSocket, "")
 		
 			while response != "END":
 				print("\t" + response)
 				serverSocket.send("received".encode())
-				response = serverSocket.recv(4096).decode()
+				response = get_response(serverSocket, "")
 		
-			sendTo = input("To:\n")
+			sendTo = get_input("To:\n")
 			serverSocket.send(sendTo.encode())
-			response = serverSocket.recv(4096).decode()
+			response = get_response(serverSocket, "")
 		
 			if(response == "DNE"):
 				#handle Does Not Exist
@@ -172,9 +205,9 @@ while operating:
 			elif(response == "message"):
 				gettingUser = False
 				#get message input, send it etc.
-				message = input("\nEnter message:\n")
+				message = get_input("\nEnter message:\n")
 				serverSocket.send(message.encode())
-				response = serverSocket.recv(4096).decode()
+				response = get_response(serverSocket, "")
 				if(response != "complete"):
 					print("Something went wrong")
 				else:
@@ -184,12 +217,12 @@ while operating:
 		
 	elif command == "EX":
 		
-		print_messages(False)
+		print_messages("")
 
 		operating = False
 		print("Sending logout command to server")
 		serverSocket.send(command.encode())
-		response = serverSocket.recv(4096).decode()
+		response = get_response(serverSocket, "")
 		
 		if response == "logout":
 			print("successfully logged out. Closing client side socket and ending program.")
