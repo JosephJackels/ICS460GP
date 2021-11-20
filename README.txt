@@ -39,20 +39,67 @@ Files present:
 				-DM
 					-send user list of active users to send message to
 					-prompt user for user to send message to
-						-check validity of entered user
+						-check validity of entered user (check done by server)
 					-prompt user for message to be sent
 					-send to server to be sent to entered target user
 					-notify user message has been sent
 				-EX
 					-print any currently pending messages
-					-send logout command to server to remove client from active users, close server's side of client socket
+					-send logout command to server to remove client from list of active users, close server's side of client socket
 					-close client side socket
 					-end program
+		-threads
+			-the client creates threads when needed while waiting for input from the user or while waiting for a response from the server while comminucating about the operations
+			-the threads are dispatched from the methods get_input and get_response
+				-get_input
+					takes in a query string to prompt the user for input. The prompt will be re-printed if any data-messages are received and printed while waiting for the user to enter an input
+				-get_response
+					 waits for a response from the server, then returns the response, printing any data messages that are recieved while waiting
+			-the threads naturally 'die' when reaching the end of the function and new threads are created the next time that a response/input is needed			
 
 	chatserver.py:
 		-the server file
 		-@parameters port
 		-begins the server to listen at machines hostname on supplied port
+		
+		-main thread
+			-loads in any credentials from file 'credentials.txt' 
+			-handles new connections, creates a new thread for every accepted connection
+
+		-connection thread
+			-gets username of requested connection, checks if suer exists or is new
+				-exists
+					-tell client that user exists
+					-prompt user for password
+					-validate password
+						-invalid
+							-tell user password is invalid, allow to try again.
+							-limits user to three attempts before ending connection
+						-valid
+							-accept user 
+							-add to list of active users
+							-get address of clients UDP socket and save for sending data messages
+				-new
+					-tell client that user is new
+					-prompt for password creation
+					-add username/password to credentials.txt
+					-get address of UDP socket
+					-add to list of active users
+			
+			-prompt client for an operation
+				-PM
+					-handle getting message and sending to all currently logged in users (but NOT the sender)
+				-DM
+					-handle communicating list of active users to client, 
+					-receiving username of user to send message to
+					-validating username
+					-receving message to be sent
+					-forwarding the message
+				-EX
+					-remove user from list of active users
+					-close sockets
+					-allow thread to exit loop and end/die
+
 	credentials.txt:
 		- if it does not exist, when a new user is created the file will be created
 		- file for storing username/password pairs to be read by the server
@@ -73,6 +120,7 @@ Example Output:
        Attempting to bind host/port to sockets
        server listening at 10.0.0.114 on port 10000
        Server ready to recieve connections
+    
     -New User Logging in Output: prompt>$python3 chatclient.py 10.0.0.224 10000 renew
        Welcome new user: renew please enter a new password:
        re
@@ -81,13 +129,15 @@ Example Output:
               PM - public message to all active users.
               DM - direct message to a  single user
               EX - exit program and logout of account
-    -Existing User Logging in:
+    
+    -Existing User Logging in: prompt>$python3 chatclient.py 10.0.0.224 10000 bob
       Existing user. Please enter password:
-      bob
+      password
       Please enter a command:
             PM - public message to all active users.
             DM - direct message to a  single user
             EX - exit program and logout of account
+    
     -Public Message(PM):
       Client 1(renew):
         PM
@@ -98,7 +148,8 @@ Example Output:
               PM - public message to all active users.
               DM - direct message to a  single user
               EX - exit program and logout of account
-      All Active User(s):
+      
+      //output for all Active User(s) besides the sender:
         *** New Message ***
         Message type: Public Message (PM)
         From: renew
@@ -109,6 +160,7 @@ Example Output:
               PM - public message to all active users.
               DM - direct message to a  single user
               EX - exit program and logout of account
+    
     -Direct Message(DM):
       Client 1(renew):
          DM
@@ -136,6 +188,7 @@ Example Output:
                 PM - public message to all active users.
                 DM - direct message to a  single user
                 EX - exit program and logout of account
+     
      -Exit(EX):
         EX
         Sending logout command to server
